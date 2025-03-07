@@ -204,3 +204,5 @@ ALLOWED_ORIGINS = [
     "http://localhost:8000",
     "http://service:8000",
 ]
+
+CSRF_TRUSTED_ORIGINS = [f'https://{NAME}' for NAME in ALLOWED_HOSTS]
