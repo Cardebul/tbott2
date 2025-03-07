@@ -2,6 +2,7 @@ from aiogram import F, Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import FSInputFile, Message
+from app.const import CHANEL_ID
 from app.abot.atomic import _remove_cart
 from app.abot.handlers.cart_router import quantity
 from app.abot.keyboards import (CART_B, CATALOG_B, FAQ_B, PROFILE_B,
@@ -19,6 +20,11 @@ router = Router(name=__name__)
 
 @router.message(Command('start'))
 async def cmd_start(message: Message):
+    if CHANEL_ID:
+        if not (chat:=await message.bot.get_chat(CHANEL_ID)): return
+        if not await message.bot.get_chat_member(CHANEL_ID, message.from_user.id): await message.answer(
+            text=f'ВЫ не подписаны на {chat.invite_link}'
+        )
     await User.objects.aget_or_create(tid=message.chat.id)
     await message.answer('Привет', reply_markup=_main_kb())
 

@@ -13,6 +13,9 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 from pathlib import Path
 import sys
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -139,6 +142,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # ]
 
 LOG_FILE_PATH = os.path.join(BASE_DIR.parent, 'logs', 'error.log')
+TBOT_LOG_FILE_PATH = os.path.join(BASE_DIR.parent, 'logs', 'tbot.log')
 
 LOGGING = {
     'version': 1,
@@ -166,6 +170,12 @@ LOGGING = {
             'formatter': 'verbose',
             'level': 'ERROR',
         },
+        'tbot_file': {
+            'class': 'logging.FileHandler',
+            'filename': TBOT_LOG_FILE_PATH,
+            'formatter': 'verbose',
+            'level': 'INFO',
+        },
     },
     'loggers': {
         'django': {
@@ -176,6 +186,11 @@ LOGGING = {
         'django.request': {
             'handlers': ['file'], 
             'level': 'ERROR',
+            'propagate': False,
+        },
+        'app': {
+            'handlers': ['console', 'tbot_file'],
+            'level': 'DEBUG',
             'propagate': False,
         },
     },

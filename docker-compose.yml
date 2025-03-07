@@ -37,26 +37,15 @@ services:
     restart: on-failure
 
   
-  # works:
-  #   env_file: .env
-  #   build:
-  #     context: .
-  #     dockerfile: service/dockerfiles/Dockerfile.works
-
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: 0.5
-  #         memory: 512M
-
-  #   volumes:
-  #     - static:/backend_static
-  #     - media:/backend_media
-  #     - ./logs:/app/logs 
-  #   depends_on:
-  #     - service
-  #     - tor-privoxy
-  #   restart: on-failure
+  works:
+    env_file: .env
+    build:
+      context: .
+      dockerfile: service/dfiles/Dockerfile.works
+    depends_on:
+      - pg
+      - service
+    restart: on-failure
   
   nginx:
     env_file: .env

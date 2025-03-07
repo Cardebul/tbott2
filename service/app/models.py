@@ -60,12 +60,18 @@ class Payment(Base):
     final_cost = models.IntegerField(validators=[MinValueValidator(0)])
     is_paid = models.BooleanField(default=False)
 
+
 class Cart(Base):
     user = models.ForeignKey(User, on_delete=models.PROTECT, related_name='carts')
     product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name='carts')
     payment = models.ForeignKey(Payment, on_delete=models.PROTECT, blank=True, null=True, related_name='carts')
     total_cost = models.IntegerField(validators=[MinValueValidator(0)])
     quantity = models.IntegerField(validators=[MinValueValidator(0)])
+
+
+class Notification(Base):
+    text = models.TextField()
+    delivered = models.BooleanField(default=False)
 
 
 
