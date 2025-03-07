@@ -1,5 +1,6 @@
-from django.db import transaction
 from app.models import Cart, Product
+from django.db import transaction
+
 
 def _add_to_cart(user, puid, qnt):
     with transaction.atomic():

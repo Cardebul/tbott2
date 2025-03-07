@@ -11,22 +11,19 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+import sys
+import os
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
+SECRET_KEY = os.getenv('SECRET_KEY')
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-4(qy!_@+*vgk4v80$umawm!vepai9_pp8gis#ga8i9)!8q%z!n'
+DEBUG = False if os.getenv('DEBUG') != 'True' else True
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = [os.getenv("IP"), os.getenv("LOCAL"),
+                 os.getenv("NAME_LOCAL"), os.getenv("DOMAIN_URL")]
 
 # Application definition
 
@@ -74,10 +71,22 @@ WSGI_APPLICATION = 'service.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
+
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('POSTGRES_DB', ''),
+        'USER': os.getenv('POSTGRES_USER', ''),
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD', ''),
+        'HOST': os.getenv('DB_HOST', ''),
+        'PORT': os.getenv('DB_PORT', '')
     }
 }
 
@@ -117,8 +126,66 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = 'backend_static/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# STATICFILES_DIRS = [
+#     BASE_DIR / 'static',
+# ]
+
+LOG_FILE_PATH = os.path.join(BASE_DIR.parent, 'logs', 'error.log')
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': True,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+            'level': 'WARNING',
+            'stream': sys.stdout,
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': LOG_FILE_PATH,
+            'formatter': 'verbose',
+            'level': 'ERROR',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'WARNING',
+            'propagate': True,
+        },
+        'django.request': {
+            'handlers': ['file'], 
+            'level': 'ERROR',
+            'propagate': False,
+        },
+    },
+    'root': {
+        'handlers': ['console', 'file'],
+        'level': 'WARNING', 
+    },
+}
+
+ALLOWED_ORIGINS = [
+    "http://localhost:8000",
+    "http://service:8000",
+]

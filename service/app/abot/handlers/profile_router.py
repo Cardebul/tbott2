@@ -1,13 +1,14 @@
-from aiogram import types, Router, F
-from aiogram.filters import Command
-from aiogram.types import Message
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import StatesGroup, State
-from app.models import User
-from geopy.geocoders import Nominatim
 import re
 
-geolocator = Nominatim(user_agent="myteleapp_v1")
+from aiogram import F, Router, types
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import Message
+from app.models import User
+from geopy.geocoders import Nominatim
+
+geolocator = Nominatim(user_agent='myteleapp_v1')
 router = Router(name=__name__)
 
 
@@ -34,7 +35,8 @@ def validate_phone(phone):
 
 def validate_name(name): return len(name) < 1000
 
-@router.message(Command("setprofile"))
+
+@router.message(Command('setprofile'))
 async def cmd_setprofile(message: Message, state: FSMContext):
     user = await User.objects.aget(tid=message.chat.id)
 
@@ -43,10 +45,12 @@ async def cmd_setprofile(message: Message, state: FSMContext):
     await state.set_state(Form.name)
     await message.answer('Добавьте имя')
 
-@router.message(Command("csetprofile"))
+
+@router.message(Command('csetprofile'))
 async def cmd_csetprofile(message: Message, state: FSMContext):
     await state.clear()    
     await message.answer('Вы вышли из создания профиля')
+
 
 @router.message(Form.name)
 async def process_name(message: types.Message, state: FSMContext):
@@ -57,7 +61,7 @@ async def process_name(message: types.Message, state: FSMContext):
     user = await User.objects.filter(tid=message.chat.id).afirst()
     user.full_name = name
     await user.asave()
-    await message.reply(f"Имя {name} успешно добавлено")
+    await message.reply(f'Имя {name} успешно добавлено')
 
     if user.phone_number and user.address: return
     if not user.phone_number:
@@ -69,6 +73,7 @@ async def process_name(message: types.Message, state: FSMContext):
         await message.answer('Введите адрес в формате 52.509669, 13.376294')
         return
 
+
 @router.message(Form.phone)
 async def process_phone(message: types.Message, state: FSMContext):
     phone = message.text
@@ -78,7 +83,7 @@ async def process_phone(message: types.Message, state: FSMContext):
     user = await User.objects.filter(tid=message.chat.id).afirst()
     user.phone_number = phone
     await user.asave()
-    await message.reply(f"Телефон {phone} успешно добавлен")
+    await message.reply(f'Телефон {phone} успешно добавлен')
 
 
     if user.full_name and user.address: return
@@ -91,25 +96,34 @@ async def process_phone(message: types.Message, state: FSMContext):
         await message.answer('Введите адрес в формате 52.509669, 13.376294')
         return
 
+
 @router.message(Form.address)
 async def process_address(message: types.Message, state: FSMContext):
     address = message.text
     if not (data:=validate_address(address)):
         await message.reply('err Адрес не соответствует шаблону 52.509669, 13.376294')
         return
-    location = geolocator.reverse(f"{data[0]}, {data[1]}")
+    location = geolocator.reverse(f'{data[0]}, {data[1]}')
     if not location:
         await message.reply('err Адрес не найден попробуйте отправить геолокацию')
         return
     user = await User.objects.filter(tid=message.chat.id).afirst()
     user.address = location
     await user.asave()
-    await message.reply(f"Адрес {location} успешно добавлен")
+    await message.reply(f'Адрес {location} успешно добавлен')
     await state.clear()
 
-@router.message(F.location)
-async def handle_location(message: types.Message):
+
+@router.message(Form.address, F.location)
+async def handle_location(message: types.Message, state: FSMContext):
     lat = message.location.latitude
     lon = message.location.longitude
-    location = geolocator.reverse(f"{lat}, {lon}")
-    await message.reply(f'Ваше гео {location}')
+    location = geolocator.reverse(f'{lat}, {lon}')
+    if not location:
+        await message.reply('err Адрес не найден попробуйте отправить геолокацию')
+        return
+    user = await User.objects.filter(tid=message.chat.id).afirst()
+    user.address = location
+    await user.asave()
+    await message.reply(f'Адрес {location} успешно добавлен')
+    await state.clear()

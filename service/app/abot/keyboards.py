@@ -1,16 +1,12 @@
-from django.db.models import QuerySet
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-
-from aiogram.filters.callback_data import CallbackData
 from typing import Literal, Optional
-
-from app.models import Category, Cart
-from asgiref.sync import sync_to_async
-
 from uuid import UUID, uuid4
 
+from aiogram.filters.callback_data import CallbackData
 from aiogram.types import ReplyKeyboardMarkup
-from aiogram.utils.keyboard import ReplyKeyboardBuilder
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
+from app.models import Cart, Category
+from asgiref.sync import sync_to_async
+from django.db.models import QuerySet
 
 CATALOG_B = 'Каталог'
 CART_B = 'Корзина'
@@ -39,19 +35,6 @@ def _add_base_buttons(builder: InlineKeyboardBuilder, with_back: bool = True):
     return builder
 
 
-# class ProfileCallbackFactory(CallbackData, prefix="profile"): ...
-
-
-# async def _category_kb():
-#     builder = InlineKeyboardBuilder()
-
-#     builder.button(
-#         text=category.name, callback_data=ProfileCallbackFactory()
-#     )
-#     _add_base_buttons(builder, with_back=False)
-#     builder.adjust(2)
-#     return builder.as_markup()
-
 class CategoryCallbackFactory(CallbackData, prefix="category"): uid: UUID
 
 
@@ -78,7 +61,7 @@ def _product_kb(products):
         text=product.name, callback_data=ProductCallbackFactory(uid=product.id)
     )
     _add_base_buttons(builder, with_back=True)
-    builder.adjust(2)
+    builder.adjust(1)
     return builder.as_markup()
 
 
@@ -135,7 +118,9 @@ def _cart_kb(cart_items: QuerySet[Cart]):
             callback_data=CartItemCallbackFactory(action='view', cart_uid=item.pk)
         )
         builder.button(text=f'❌ удалить', callback_data=CartItemCallbackFactory(action='remove', cart_uid=item.pk))
-        builder.adjust(2)
-    builder.button(text=f'Оформить за {total}', callback_data=CartItemCallbackFactory(action='make_order'))
+    if cart_items: builder.button(
+        text=f'Оформить за {total}', callback_data=CartItemCallbackFactory(action='make_order')
+    )
 
+    builder.adjust(2)
     return builder.as_markup()

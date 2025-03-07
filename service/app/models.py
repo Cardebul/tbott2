@@ -1,6 +1,8 @@
-from django.db import models
-from django.core.validators import MinValueValidator
 from uuid import uuid4
+
+from django.core.validators import MinValueValidator
+from django.db import models
+
 # Create your models here.
 
 class Base(models.Model):
@@ -24,13 +26,9 @@ class User(Base):
     def personal_data(self):
         return (self.full_name and self.phone_number and self.address)
 
-    async def get_purchase_amount(self):
-        total_cost = await Cart.objects.filter(user=self).aaggregate(models.Sum('total_cost'))
-        return total_cost.get('total_cost__sum')
-
 
 class Category(Base):
-    EMPTY_CATEGORY = 'empty'
+    EMPTY_CATEGORY = 'Без категории'
 
     name = models.CharField(max_length=1024)
 
@@ -57,11 +55,17 @@ class Product(Base):
     def __str__(self): return f'{self.name}'
 
 
+class Payment(Base):
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name='payments')
+    final_cost = models.IntegerField(validators=[MinValueValidator(0)])
+    is_paid = models.BooleanField(default=False)
+
 class Cart(Base):
     user = models.ForeignKey(User, on_delete=models.PROTECT, related_name='carts')
     product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name='carts')
+    payment = models.ForeignKey(Payment, on_delete=models.PROTECT, blank=True, null=True, related_name='carts')
     total_cost = models.IntegerField(validators=[MinValueValidator(0)])
     quantity = models.IntegerField(validators=[MinValueValidator(0)])
-    is_paid = models.BooleanField(default=False)
+
 
 

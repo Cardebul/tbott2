@@ -1,26 +1,27 @@
-from aiogram import Router, F, types
+from aiogram import F, Router, types
 from aiogram.filters import Command
-from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
-from app.models import Category, Product, User, Cart
-from aiogram.types import FSInputFile
-
+from aiogram.types import FSInputFile, Message
 from app.abot.atomic import _remove_cart
-from app.abot.keyboards import (
-    BaseCallbackFactory, CategoryCallbackFactory, ProductCallbackFactory, CartItemCallbackFactory,
-    CATALOG_B, CART_B, FAQ_B, PROFILE_B, _main_kb, _category_kb, _product_kb, _cart_kb
-)
-
 from app.abot.handlers.cart_router import quantity
+from app.abot.keyboards import (CART_B, CATALOG_B, FAQ_B, PROFILE_B,
+                                BaseCallbackFactory, CartItemCallbackFactory,
+                                CategoryCallbackFactory,
+                                ProductCallbackFactory, _cart_kb, _category_kb,
+                                _main_kb, _product_kb)
+from app.models import Cart, Payment, Product, User, models
+from app.abot.uorder import after_payment, make_uorder
 from asgiref.sync import sync_to_async
+
 
 router = Router(name=__name__)
 
 
-@router.message(Command("start"))
+@router.message(Command('start'))
 async def cmd_start(message: Message):
     await User.objects.aget_or_create(tid=message.chat.id)
-    await message.answer("Привет", reply_markup=_main_kb())
+    await message.answer('Привет', reply_markup=_main_kb())
+
 
 @router.message(F.text == PROFILE_B)
 async def profile(message: Message):
@@ -37,16 +38,17 @@ async def profile(message: Message):
 
     await message.answer(text=base_text)
 
+
 @router.message(F.text == CATALOG_B)
 async def catalog(message: Message):
     category_kb = await _category_kb()
-    await message.answer(f"{CATALOG_B}", reply_markup=category_kb)
+    await message.answer(f'{CATALOG_B}', reply_markup=category_kb)
 
 
 @router.message(F.text == CART_B)
 async def cart(message: types.Message):
     cart_items = await sync_to_async(list)(
-        Cart.objects.select_related('product').filter(user__tid=message.chat.id, is_paid=False)
+        Cart.objects.select_related('product').filter(user__tid=message.chat.id, payment__isnull=True)
     )
 
     await message.answer(
@@ -60,6 +62,9 @@ async def faq(message: Message):
 
 
 
+
+PROD = False
+
 @router.callback_query(CartItemCallbackFactory.filter(F.action == 'make_order'))
 async def callbacks_product(
         callback: types.CallbackQuery, 
@@ -69,12 +74,33 @@ async def callbacks_product(
     if not user.personal_data:
         await callback.answer('Заполните личные данные в Профиле')
         return
-    ... # ukasa
+    if not await Cart.objects.filter(user=user).aexists():
+        await callback.answer('Нет доступных к оформлению заказов')
+        return
+    
+    final_cost = await Cart.objects.filter(
+        user__tid=callback.message.chat.id, payment__isnull=True
+    ).aaggregate(final_cost=models.Sum('total_cost'))
+    final_cost = final_cost.get('final_cost')
+    payment = await Payment.objects.acreate(user=user, final_cost=final_cost)
+    await Cart.objects.filter(user__tid=callback.message.chat.id, payment__isnull=True).aupdate(payment=payment)
+    if final_cost and (
+        data:=await make_uorder(value=final_cost)
+    ) and (1): pay_url, _ = data
 
-    full_cart = await sync_to_async(list)(
-        Cart.objects.select_related('product').filter(user__tid=callback.message.chat.id, is_paid=False)
+    else: return await callback.answer('try later')
+    text = (
+        f'Товаров в корзине на {final_cost}\n'
+        f'Произведите оплату по <a href="{pay_url}">ссылке</a>'
     )
-
+    await callback.message.answer(
+        text=text,
+        parse_mode='HTML'
+    )
+    await callback.answer()
+    if not PROD:
+        await after_payment(payment.pk)
+        await callback.message.answer('Успешно')
     
 @router.callback_query(CartItemCallbackFactory.filter(F.action.in_(['remove', 'view'])))
 async def callbacks_product(
@@ -87,7 +113,7 @@ async def callbacks_product(
             await callback.answer('err')
             return
         cart_items = await sync_to_async(list)(
-            Cart.objects.select_related('product').filter(user__tid=callback.message.chat.id, is_paid=False)
+            Cart.objects.select_related('product').filter(user__tid=callback.message.chat.id, payment__isnull=True)
         )
         await callback.message.edit_text(
             text=callback.message.text,
@@ -98,9 +124,9 @@ async def callbacks_product(
     if not (product:=await Product.objects.filter(carts__id=callback_data.cart_uid).afirst()): return await callback.answer('err')
     photo = FSInputFile(product.image.path)
     base_text = (
-        f"Продукт: {product.name}\n"
-        f"Цена: {product.price}\n"
-        f"Описание: {product.description}\n\n"
+        f'Продукт: {product.name}\n'
+        f'Цена: {product.price}\n'
+        f'Описание: {product.description}\n\n'
         f''
     )
     await callback.message.answer_photo(
@@ -120,10 +146,10 @@ async def callbacks_product_list(
     products = await sync_to_async(list)(Product.objects.filter(category__pk=callback_data.uid))
     product_kb = _product_kb(products)
     await state.update_data(last_message={
-        "text": callback.message.text,
-        "reply_markup": callback.message.reply_markup
+        'text': callback.message.text,
+        'reply_markup': callback.message.reply_markup
     })
-    await callback.message.edit_text(f"Продукты:", reply_markup=product_kb)
+    await callback.message.edit_text(f'Продукты:', reply_markup=product_kb)
     await callback.answer()
 
 @router.callback_query(ProductCallbackFactory.filter())
@@ -142,21 +168,21 @@ async def handle_base_buttons(
     callback_data: BaseCallbackFactory,
     state: FSMContext
 ):
-    if callback_data.action == "close":
+    if callback_data.action == 'close':
         await callback.message.delete()
-    elif callback_data.action == "back":
+    elif callback_data.action == 'back':
         previous_state = await state.get_data()
-        reply_markup = previous_state["last_message"]["reply_markup"]
-        if "last_message" in previous_state:
+        reply_markup = previous_state['last_message']['reply_markup']
+        if 'last_message' in previous_state:
             if previous_state['last_message'].get('caption'):
                 print('incaption')
                 await callback.message.edit_caption(
-                    caption=previous_state["last_message"]["text"],
+                    caption=previous_state['last_message']['text'],
                     reply_markup=reply_markup
                 )
             else:
                 await callback.message.edit_text(
-                    text=previous_state["last_message"]["text"],
+                    text=previous_state['last_message']['text'],
                     reply_markup=reply_markup
                 )
     await callback.answer()

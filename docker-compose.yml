@@ -1,0 +1,75 @@
+volumes:
+  pg_data:
+  static:
+  media:
+  logs:
+
+services:
+  pg:
+    image: postgres:16-alpine3.20
+    env_file: .env
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: on-failure
+
+  service:
+    env_file: .env
+    build:
+      context: .
+      dockerfile: service/dfiles/Dockerfile
+    
+    volumes:
+      - static:/backend_static
+      - media:/backend_media
+      - ./logs:/app/logs 
+    depends_on:
+      - pg
+    restart: on-failure
+
+  abot:
+    env_file: .env
+    build:
+      context: .
+      dockerfile: service/dfiles/Dockerfile.abot
+    depends_on:
+      - pg
+      - service
+    restart: on-failure
+
+  
+  # works:
+  #   env_file: .env
+  #   build:
+  #     context: .
+  #     dockerfile: service/dockerfiles/Dockerfile.works
+
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: 0.5
+  #         memory: 512M
+
+  #   volumes:
+  #     - static:/backend_static
+  #     - media:/backend_media
+  #     - ./logs:/app/logs 
+  #   depends_on:
+  #     - service
+  #     - tor-privoxy
+  #   restart: on-failure
+  
+  nginx:
+    env_file: .env
+    image: nginx:1.27.3-alpine-slim
+    build:
+      context: nginx/
+      dockerfile: Dockerfile
+    depends_on:
+      - service
+    volumes:
+      - ./nginx:/etc/nginx/conf.d
+      - static:/backend_static
+      - media:/backend_media
+    ports:
+      - "8000:80"  # 80:80 outer:inner
+    restart: on-failure
